@@ -4,6 +4,8 @@ import data from "./data.js";
 import Videos from "./dbModal.js";
 import User from "./models/User.js";
 import bcrypt from "bcrypt";
+import FoodCategory from "./models/FoodCategory.js";
+import FoodItem from "./models/FoodItem.js";
 
 // app config
 const app = express();
@@ -48,12 +50,16 @@ mongoose
 app.post("/add-user", async (req, res) => {
   try {
     const { name, email, password } = req.body;
+
+    // Save plain-text password (NOT RECOMMENDED)
     const newUser = new User({ name, email, password });
     await newUser.save();
+
     res
       .status(201)
       .json({ message: "User created successfully", user: newUser });
   } catch (err) {
+    console.error("Error creating user:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -71,34 +77,97 @@ app.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Check if user exists
+    // Check if the user exists in the database
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
 
-    // Compare provided password with the hashed password
-    const isPasswordMatch = await bcrypt.compare(password, user.password);
-    if (!isPasswordMatch) {
+    // Compare the provided password with the one in the database
+    if (user.password !== password) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    // Login successful
-    res
-      .status(200)
-      .json({
-        message: "Login successful",
-        user: { email: user.email, name: user.name },
-      });
+    // If credentials match, login is successful
+    res.status(200).json({
+      message: "Login successful",
+      user: { email: user.email, name: user.name },
+    });
   } catch (err) {
-    console.error("Error during login:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
 
-mongoose.set("bufferTimeoutMS", 20000); // Set timeout to 20 seconds
+app.post("/food-category", async (req, res) => {
+  try {
+    const { category_name } = req.body;
 
-// api endpoints
+    if (!category_name) {
+      return res.status(400).json({ error: "Category name is required" });
+    }
+
+    const newCategory = new FoodCategory({ category_name });
+    await newCategory.save();
+
+    res.status(201).json({
+      message: "Food category created successfully",
+      category: newCategory,
+    });
+  } catch (err) {
+    console.error("Error creating food category:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/food-category", async (req, res) => {
+  try {
+    const categories = await FoodCategory.find({});
+    res.status(200).json(categories);
+  } catch (err) {
+    console.error("Error retrieving food categories:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/food-item", async (req, res) => {
+  try {
+    const { categoryName, name, img, options, description } = req.body;
+
+    if (!categoryName || !name) {
+      return res.status(400).json({ error: "Category and name are required" });
+    }
+
+    const newFoodItem = new FoodItem({
+      categoryName,
+      name,
+      img,
+      options,
+      description,
+    });
+    await newFoodItem.save();
+
+    res.status(201).json({
+      message: "Food item created successfully",
+      foodItem: newFoodItem,
+    });
+  } catch (err) {
+    console.error("Error creating food item:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/food-item", async (req, res) => {
+  try {
+    const foodItems = await FoodItem.find({});
+    res.status(200).json(foodItems);
+  } catch (err) {
+    console.error("Error retrieving food items:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+mongoose.set("bufferTimeoutMS", 20000);
+
 app.get("/", (req, res) => res.status(200).send("Hello World!"));
 
 app.get("/v1/posts", (req, res) => res.status(200).send(data));
