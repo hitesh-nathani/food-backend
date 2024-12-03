@@ -7,6 +7,7 @@ import bcrypt from "bcrypt";
 import FoodCategory from "./models/FoodCategory.js";
 import FoodItem from "./models/FoodItem.js";
 import cors from "cors";
+import jwt from "jsonwebtoken";
 
 // app config
 const app = express();
@@ -30,6 +31,9 @@ app.use((req, res, next) => {
   console.log("Body:", req.body);
   next();
 });
+
+// Hardcoded secret key (for development only)
+const JWT_SECRET = "uJr8$nD7Fg!xKvP3Lm@9#zGhQqT*Rt5Vy^bC2J";
 
 // DB config
 const connectionUrl =
@@ -67,7 +71,24 @@ app.post("/add-user", async (req, res) => {
   }
 });
 
-app.get("/users", async (req, res) => {
+const authenticateToken = (req, res, next) => {
+  const token = req.headers["authorization"]?.split(" ")[1]; // Extract token from "Bearer <token>"
+
+  if (!token) {
+    return res.status(401).json({ error: "Access token missing or invalid" });
+  }
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) {
+      return res.status(403).json({ error: "Invalid or expired token" });
+    }
+
+    req.user = user; // Attach the decoded token payload to the request
+    next();
+  });
+};
+
+app.get("/users", authenticateToken, async (req, res) => {
   try {
     const users = await User.find({});
     res.status(200).json(users);
@@ -86,15 +107,19 @@ app.post("/login", async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    // Compare the provided password with the one in the database
     if (user.password !== password) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    // If credentials match, login is successful
+    // Generate a JWT token
+    const token = jwt.sign({ id: user._id, email: user.email }, JWT_SECRET, {
+      expiresIn: "1h", // Token expires in 1 hour
+    });
+
+    // Respond with the token
     res.status(200).json({
       message: "Login successful",
-      user: { email: user.email, name: user.name },
+      token, // Send token to the client
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
