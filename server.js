@@ -6,12 +6,14 @@ import User from "./models/User.js";
 import bcrypt from "bcrypt";
 import FoodCategory from "./models/FoodCategory.js";
 import FoodItem from "./models/FoodItem.js";
+import cors from "cors";
 
 // app config
 const app = express();
 const port = 9000;
 
 // middlewares
+app.use(cors());
 app.use(express.json()); // Parse incoming JSON payloads
 
 // app.use((req, res, next) => {
@@ -37,6 +39,7 @@ mongoose
   .connect(connectionUrl, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
+    serverSelectionTimeoutMS: 5000, // 5 seconds timeout
   })
   .then(
     () => {
@@ -49,10 +52,10 @@ mongoose
 
 app.post("/add-user", async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, address } = req.body;
 
     // Save plain-text password (NOT RECOMMENDED)
-    const newUser = new User({ name, email, password });
+    const newUser = new User({ name, email, password, address });
     await newUser.save();
 
     res
@@ -150,6 +153,7 @@ app.post("/food-item", async (req, res) => {
       message: "Food item created successfully",
       foodItem: newFoodItem,
     });
+    console.log("🚀 ~ app.post ~ newFoodItem:", newFoodItem);
   } catch (err) {
     console.error("Error creating food item:", err.message);
     res.status(500).json({ error: err.message });
